@@ -8,6 +8,7 @@ import (
 	_ "image/png"
 	"os"
 
+	"github.com/disintegration/imaging"
 	"github.com/muesli/clusters"
 	"github.com/muesli/kmeans"
 )
@@ -40,40 +41,69 @@ func main() {
 	}
 
 	bounds := im.Bounds()
-	obs := make(clusters.Observations, 0, bounds.Dx()*bounds.Dy()/4)
-	dsf := 16 // downsampling factor = 16 pixels per observation TODO do this smartly
+	w := bounds.Dx()
+	h := bounds.Dy()
+	dsm := 256 // the max dimension after downsampling
+	switch {
+	case w > dsm && w <= h:
+		im = imaging.Resize(im, 0, dsm, imaging.Lanczos)
+		bounds = im.Bounds()
+	case h > dsm && h <= w:
+		im = imaging.Resize(im, dsm, 0, imaging.Lanczos)
+		bounds = im.Bounds()
+	}
+
+	obs := make(clusters.Observations, 0, bounds.Dx()*bounds.Dy())
 	var r, g, b uint32
-	for y := bounds.Min.Y; y < bounds.Max.Y; y += dsf {
-		for x := bounds.Min.X; x < bounds.Max.X; x += dsf {
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, g, b, _ = im.At(x, y).RGBA()
 			obs = append(obs, observeRGB(r, g, b))
 		}
 	}
 
-	km, err := kmeans.NewWithOptions(0.5, nil)
-	if err != nil {
-		exit(err)
-	}
-
 	// Partition the observations into 8 clusters, where each center represents
 	// an approximation of a prominent color in the source.
+	km := kmeans.New()
 	colors, err := km.Partition(obs, 8)
 	if err != nil {
 		exit(err)
 	}
 
-	// TODO build a proper output engine
-	for i, c := range colors {
-		fmt.Printf("color %v: #%s\n", i, hexify(c.Center))
+	printPalette(colors)
+}
+
+// Print out the clusters' centers, which represented normalized rgb values, as
+// colors on the terminal.
+//
+// TODO build a proper output engine
+func printPalette(c clusters.Clusters) {
+	height := 2
+	width := 5
+	for y := 0; y < height; y++ {
+		for _, color := range c {
+			r, g, b := rgb255(color.Center)
+			for x := 0; x < width; x++ {
+				fmt.Printf("\x1b[0;48;2;%d;%d;%dm ", r, g, b)
+			}
+			fmt.Printf("\x1b[0m ")
+		}
+		fmt.Printf("\x1b[0m\n")
 	}
 }
 
-// Convert a [3]float64 representing normalized RGB values into a hexadecimal
-// string.
-func hexify(c clusters.Coordinates) string {
+// Convert a [3]float64 representing normalized rgb values into three separate 8-bit rgb values
+func rgb255(c clusters.Coordinates) (uint8, uint8, uint8) {
 	r := uint8(c[0] * 0xff)
 	g := uint8(c[1] * 0xff)
 	b := uint8(c[2] * 0xff)
+	return r, g, b
+}
+
+// Convert a [3]float64 representing normalized rgb values into a hexadecimal
+// string.
+func hexify(c clusters.Coordinates) string {
+	r, g, b := rgb255(c)
 	return fmt.Sprintf("%X%X%X", r, g, b)
 }
 
