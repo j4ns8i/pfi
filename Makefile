@@ -1,4 +1,4 @@
-SRC = $(shell find . -name '*.go')
+SRC = $(shell find . -name *.rs)
 BINARY = pfi
 
 .PHONY: help
@@ -10,12 +10,23 @@ help:
 	@echo "  build:	build pfi"
 	@echo "  dev-test: build and run against test image"
 
-$(BINARY): $(SRC)
-	go build -o $(BINARY)
+target/release/$(BINARY): $(SRC)
+	cargo build --release
 
-.PHONY: build
-build: $(BINARY)
+target/debug/$(BINARY): $(SRC)
+	cargo build
 
-.PHONY: dev-test
-dev-test: test-output.yaml.tmpl test.jpg $(BINARY)
-	./$(BINARY) test-output.yaml.tmpl test-output.yaml test.jpg
+.INTERMEDIATE: $(BINARY)
+bin/$(BINARY): $(BINARY)
+	mkdir -p bin
+	mv $< $@
+
+.PHONY: build-release
+build-release: target/release/$(BINARY)
+	cp target/release/$(BINARY) $(BINARY)
+	@$(MAKE) --no-print-directory bin/$(BINARY)
+
+.PHONY: build-debug
+build-debug: target/debug/$(BINARY)
+	cp target/debug/$(BINARY) $(BINARY)
+	@$(MAKE) --no-print-directory bin/$(BINARY)

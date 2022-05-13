@@ -1,1 +1,5 @@
-/pfi
+pfi
+!pfi/
+.vscode
+
+/target
