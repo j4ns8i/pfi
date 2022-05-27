@@ -2,13 +2,16 @@ SRC = $(shell find . -name *.rs)
 BINARY = pfi
 
 .PHONY: help
-help:
-	@echo "pfi"
-	@echo
-	@echo "Usage:"
-	@echo "  help:		show this help"
-	@echo "  build:	build pfi"
-	@echo "  dev-test: build and run against test image"
+help: ## Show this help
+	@grep -E '^[a-z.A-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: install
+install: ## Install pfi
+	cargo install --path .
+
+.PHONY: uninstall
+uninstall: ## Uninstall pfi
+	cargo uninstall
 
 target/release/$(BINARY): $(SRC)
 	cargo build --release
@@ -22,11 +25,15 @@ bin/$(BINARY): $(BINARY)
 	mv $< $@
 
 .PHONY: build-release
-build-release: target/release/$(BINARY)
+build-release: target/release/$(BINARY) ## Build release version
 	cp target/release/$(BINARY) $(BINARY)
 	@$(MAKE) --no-print-directory bin/$(BINARY)
 
 .PHONY: build-debug
-build-debug: target/debug/$(BINARY)
+build-debug: target/debug/$(BINARY) ## Build debug version
 	cp target/debug/$(BINARY) $(BINARY)
 	@$(MAKE) --no-print-directory bin/$(BINARY)
+
+.PHONY: test
+test: ## Run unit tests
+	cargo test
